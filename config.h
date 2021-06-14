@@ -34,6 +34,9 @@ namespace Config
     const unsigned kGcSize = 30;
     // 默认的 GC 间隔，ms
     const unsigned kGcInter = 1000;
+
+    // 默认的限流参数，单位 QPS
+    const unsigned kDefaultRateLimit = 60;
 }
 
 #endif //EDGEPLAYER_CONFIG_H
