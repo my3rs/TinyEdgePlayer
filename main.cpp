@@ -1,13 +1,18 @@
 #include <iostream>
 #include <vector>
+#include <glog/logging.h>
 #include "threadpool.h"
 #include "Storage.h"
-#include "easylogging++.h"
+//#include "easylogging++.h"
 #include "Server.h"
 
-INITIALIZE_EASYLOGGINGPP
+//#define ELPP_UNICODE          // easylogging 使用Unicode字符集
+//#define ELPP_THREAD_SAFE      // easylogging 多线程支持
+//
+//INITIALIZE_EASYLOGGINGPP
 
 std::vector<std::unique_ptr<Server>> server_pool;
+std::vector<std::thread> clients;
 
 std::thread monitor;
 bool shutdown = false;
@@ -36,12 +41,6 @@ void StopMonitor()
         monitor.join();
 }
 
-int GenerateTaskTime()
-{
-    int random = rand() % 100;
-    return 100 + random;
-}
-
 int SelectOnePoolRandom()
 {
     static int max = server_pool.size();
@@ -64,26 +63,87 @@ void StopServers()
     }
 }
 
+void SendRequest()
+{
+    int offset = SelectOnePoolRandom();     // 选择处理请求的服务器
+
+    auto task = GenerateRandomTask();       // 生成任务请求
+
+
+    std::ostringstream client_id;
+    client_id << std::this_thread::get_id();
+
+
+    std::string log;
+    log =  "Task # ---> pool[" + std::to_string(offset) + "]";
+
+//    LOG(INFO) << log;
+    server_pool[offset]->Execute(task);  // 由上一步选择的服务器处理生成的请求
+}
+
+void InitClients()
+{
+    for (int j = 0; j < 500; ++ j)
+    {
+        clients.emplace_back(std::thread([](){
+            for (int i = 0; i < 10; ++ i)
+            {
+                SendRequest();
+                std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            }
+        }));
+    }
+}
+
+void StopClients()
+{
+    for (auto& t : clients)
+    {
+        if (t.joinable())
+            t.join();
+    }
+}
+
 int main(int argc, char* argv[])
 {
+    google::InitGoogleLogging(argv[0]);
+    FLAGS_logtostderr = true;
+    FLAGS_log_prefix = false;
+//    START_EASYLOGGINGPP(argc, argv);
+
     srand(time(nullptr));
 
     InitPools(1);
 
     monitor = std::thread(MonitorFunc);
 
-    for (int i = 0; i < 10; ++ i)
-    {
+    InitClients();
+    StopClients();
 
-        int offset = SelectOnePoolRandom();
-        LOG(INFO) << "Task #" << i << "--> pool[" << offset << "]";
-        server_pool[offset]->Execute(Task(10, 20));
 
-    }
+//    std::string log;
+//    for (int i = 0; i < 100; ++ i)
+//    {
+//
+//        int offset = SelectOnePoolRandom();     // 选择处理请求的服务器
+//        auto task = GenerateRandomTask();       // 生成任务请求
+//
+//        log.clear();
+//        log = "Task #" + std::to_string(i) + "---> pool[" + std::to_string(offset) + "]";
+//
+//        LOG(INFO) << log;
+//        auto ret = server_pool[offset]->Execute(task);  // 由上一步选择的服务器处理生成的请求
+//        if (ret.get())
+//            LOG(INFO) << "Task #" << i << " completed";
+//    }
 
+    // 先停止Server，再停止Monitor
+    StopServers();
 
     StopMonitor();
-    StopServers();
+
+
+    google::ShutdownGoogleLogging();
 
     return 0;
 }
