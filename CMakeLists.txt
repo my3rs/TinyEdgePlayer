@@ -1,10 +1,12 @@
-cmake_minimum_required(VERSION 3.10)
-project(TinyEdgePlayer)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.10)
+PROJECT(TinyEdgePlayer)
 
-set(CMAKE_CXX_STANDARD 17)
+SET(CMAKE_CXX_STANDARD 17)
 
+ADD_SUBDIRECTORY(rate_limiter)
 
 AUX_SOURCE_DIRECTORY(. SRC_LIST)
 
-ADD_EXECUTABLE(TinyEdgePlayer ${SRC_LIST} Storage.cpp)
-target_link_libraries(TinyEdgePlayer pthread)
+ADD_EXECUTABLE(TinyEdgePlayer ${SRC_LIST})
+TARGET_LINK_LIBRARIES(TinyEdgePlayer pthread glog rate)
+
