@@ -2,11 +2,12 @@
 #define TINYEDGEPLAYER_SERVER_H
 
 #include <future>
+#include <glog/logging.h>
 
 #include "threadpool.h"
 #include "Storage.h"
 #include "Task.h"
-#include "easylogging++.h"
+#include "rate_limiter/rate_limiter.h"
 
 class Server
 {
@@ -26,6 +27,8 @@ public:
     double GetCurrentSpeed() { return cpu_.GetCurrentSpeed_(); }
 
     void PrintStatus();
+
+    std::string GetStatusLogString();
     void GcFunc();
 
 private:
@@ -34,6 +37,7 @@ private:
     Storage     storage_;
 
     bool        shutdown_;
+    RateLimiter rate_limiter_;
 };
 
 
