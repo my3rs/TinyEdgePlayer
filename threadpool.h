@@ -7,8 +7,8 @@
 #include <functional>
 #include <future>
 #include <queue>
+#include <glog/logging.h>
 
-#include "easylogging++.h"
 
 class ThreadPool
 {
@@ -97,7 +97,7 @@ auto ThreadPool::ExecuteTask(F &&f, Args&&... args)
     };
 
     tasks_.emplace_back(std::move(task));
-//    LOG(INFO) << "ThreadPool task size: " << tasks_.size() << ", speed: " << speed_;
+//    LOG(INFO) << "ThreadPool task size: " << tasks_.size();
 
     cond_.notify_one();
 
