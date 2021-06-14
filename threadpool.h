@@ -1,0 +1,107 @@
+#ifndef SEAHI_THREADPOOL_H
+#define SEAHI_THREADPOOL_H
+
+#include <atomic>
+#include <deque>
+#include <mutex>
+#include <functional>
+#include <future>
+#include <queue>
+
+#include "easylogging++.h"
+
+class ThreadPool
+{
+public:
+    ThreadPool() = delete ;
+    explicit ThreadPool(unsigned thread_count);
+    ~ThreadPool();
+
+    ThreadPool(const ThreadPool&) = delete;
+    void operator=(const ThreadPool&) = delete;
+
+    void Stop()
+    {
+        shutdown_ = true;
+    }
+
+    double  load() const;
+
+    /**
+     * 等待所有线程结束，然后关闭线程池
+     */
+    void JoinAll();
+
+    /**
+     * 向线程池中添加一个任务
+     */
+    template<typename F, typename... Args>
+    auto ExecuteTask(F&& f, Args&&... args)
+        -> std::future<typename std::result_of<F (Args...)>::type>;
+
+    double GetCurrentSpeed_() const;
+    int GetTaskQueueSize() const;
+
+private:
+    /**
+     * worker 线程函数
+     */
+    void _WorkerRoutine();
+    void _MonitorRoutine();
+
+
+private:
+    unsigned                cnt_threads_;
+    std::deque<std::thread> worker_threads;             // 线程池中的线程
+//    std::thread             monitor_;
+
+
+    std::mutex              mutex_;
+    std::condition_variable cond_;
+    bool                    shutdown_;
+    std::deque<std::function<void ()>>  tasks_; // 任务队列
+
+    std::atomic<unsigned>   cnt_tasks_1_sec_;
+
+    std::queue<int>         speeds_;
+    std::queue<int>         task_queue_size_;
+};
+
+template<typename F, typename... Args>
+auto ThreadPool::ExecuteTask(F &&f, Args&&... args)
+            -> std::future<typename std::result_of<F (Args...)>::type>
+{
+    using result_type = typename std::result_of<F (Args...)>::type;
+
+    std::unique_lock<std::mutex> guard(mutex_);
+
+    if (shutdown_)
+        return std::future<result_type>();
+
+    auto promise = std::make_shared<std::promise<result_type>>();
+
+    auto future = promise->get_future();
+
+    auto func = std::bind(std::forward<F>(f), std::forward<Args>(args)...);
+    auto task = [t = std::move(func), pm = promise]() mutable {
+        try {
+            if constexpr (std::is_same<void, result_type>::value) {
+                t();
+                pm->set_value();
+            } else {
+                pm->set_value(t());
+            }
+        } catch (...) {
+            pm->set_exception(std::current_exception());
+        }
+    };
+
+    tasks_.emplace_back(std::move(task));
+//    LOG(INFO) << "ThreadPool task size: " << tasks_.size() << ", speed: " << speed_;
+
+    cond_.notify_one();
+
+    return future;
+}
+
+#endif //SEAHI_THREADPOOL_H
