@@ -15,6 +15,10 @@ std::vector<std::thread> clients;
 std::thread monitor;
 bool shutdown = false;
 
+/*
+ * 监测线程的线程函数
+ * 负责周期性打印每台服务器的的状态
+ */
 void MonitorFunc()
 {
     while (!shutdown)
@@ -31,6 +35,9 @@ void MonitorFunc()
     }
 }
 
+/*
+ * 停止监测线程
+ */
 void StopMonitor()
 {
     shutdown = true;
@@ -90,6 +97,10 @@ int SelectOneServer()
 
 }
 
+/*
+ * 发送一个请求给客户端
+ * 同时具有客户端和负载均衡器的功能
+ */
 void SendRequest()
 {
     int offset = SelectOneServer();     // 选择处理请求的服务器
@@ -108,6 +119,9 @@ void SendRequest()
     server_pool[offset]->Execute(task);  // 由上一步选择的服务器处理生成的请求
 }
 
+/*
+ * 初始化客户端
+ */
 void InitClients()
 {
     for (int j = 0; j < 500; ++ j)
@@ -122,6 +136,9 @@ void InitClients()
     }
 }
 
+/*
+ * 停止所有客户端
+ */
 void StopClients()
 {
     for (auto& t : clients)
@@ -144,17 +161,21 @@ int main(int argc, char* argv[])
 
     srand(time(nullptr));
 
+    // 初始化服务端
     InitPools(1);
 
     monitor = std::thread(MonitorFunc);
 
+    // 初始化客户端
     InitClients();
+
+    // 停止客户端
     StopClients();
 
 
     // 先停止Server，再停止Monitor
+    // 顺序不要颠倒，否则在等待Server停止的过程中没有日志输出
     StopServers();
-
     StopMonitor();
 
 
