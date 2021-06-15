@@ -8,5 +8,6 @@ ADD_SUBDIRECTORY(rate_limiter)
 AUX_SOURCE_DIRECTORY(. SRC_LIST)
 
 ADD_EXECUTABLE(TinyEdgePlayer ${SRC_LIST})
-TARGET_LINK_LIBRARIES(TinyEdgePlayer pthread glog rate)
+TARGET_LINK_LIBRARIES(TinyEdgePlayer pthread glog gflags rate)
 
+ADD_EXECUTABLE(tmp test.cpp)

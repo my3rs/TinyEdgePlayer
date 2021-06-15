@@ -1,10 +1,13 @@
 #include <iostream>
 #include <vector>
 #include <glog/logging.h>
+#include <gflags/gflags.h>
+
 #include "threadpool.h"
 #include "Storage.h"
 #include "Server.h"
 
+DEFINE_string(balancer, "random", "负载均衡算法，可选值：random, round, game, power");
 
 std::vector<std::unique_ptr<Server>> server_pool;
 std::vector<std::thread> clients;
@@ -36,10 +39,25 @@ void StopMonitor()
         monitor.join();
 }
 
+/*
+ * 负载均衡算法：随机
+ */
 int SelectOnePoolRandom()
 {
     static int max = server_pool.size();
     return rand() % max;
+}
+
+/*
+ * 负载均衡算法：轮询
+ */
+int SelectOneServerRoundRobin()
+{
+    static int offset;
+    if (offset >= server_pool.size())
+        offset = 0;
+
+    return offset ++;
 }
 
 void InitPools(int count)
@@ -58,9 +76,23 @@ void StopServers()
     }
 }
 
+/*
+ * 根据命令行参数balancer提供的负载均衡算法选择一个服务器
+ */
+int SelectOneServer()
+{
+    if (FLAGS_balancer == "random" || FLAGS_balancer == "rand")
+    {
+        return SelectOnePoolRandom();
+    } else if (FLAGS_balancer == "round") {
+
+    }
+
+}
+
 void SendRequest()
 {
-    int offset = SelectOnePoolRandom();     // 选择处理请求的服务器
+    int offset = SelectOneServer();     // 选择处理请求的服务器
 
     auto task = GenerateRandomTask();       // 生成任务请求
 
@@ -101,9 +133,14 @@ void StopClients()
 
 int main(int argc, char* argv[])
 {
+    // 初始化 gflags
+    google::ParseCommandLineFlags(&argc, &argv, true);
+
+    // 初始化 glog
     google::InitGoogleLogging(argv[0]);
     FLAGS_logtostderr = true;
     FLAGS_log_prefix = false;
+
 
     srand(time(nullptr));
 
