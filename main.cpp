@@ -3,13 +3,8 @@
 #include <glog/logging.h>
 #include "threadpool.h"
 #include "Storage.h"
-//#include "easylogging++.h"
 #include "Server.h"
 
-//#define ELPP_UNICODE          // easylogging 使用Unicode字符集
-//#define ELPP_THREAD_SAFE      // easylogging 多线程支持
-//
-//INITIALIZE_EASYLOGGINGPP
 
 std::vector<std::unique_ptr<Server>> server_pool;
 std::vector<std::thread> clients;
@@ -109,7 +104,6 @@ int main(int argc, char* argv[])
     google::InitGoogleLogging(argv[0]);
     FLAGS_logtostderr = true;
     FLAGS_log_prefix = false;
-//    START_EASYLOGGINGPP(argc, argv);
 
     srand(time(nullptr));
 
@@ -120,22 +114,6 @@ int main(int argc, char* argv[])
     InitClients();
     StopClients();
 
-
-//    std::string log;
-//    for (int i = 0; i < 100; ++ i)
-//    {
-//
-//        int offset = SelectOnePoolRandom();     // 选择处理请求的服务器
-//        auto task = GenerateRandomTask();       // 生成任务请求
-//
-//        log.clear();
-//        log = "Task #" + std::to_string(i) + "---> pool[" + std::to_string(offset) + "]";
-//
-//        LOG(INFO) << log;
-//        auto ret = server_pool[offset]->Execute(task);  // 由上一步选择的服务器处理生成的请求
-//        if (ret.get())
-//            LOG(INFO) << "Task #" << i << " completed";
-//    }
 
     // 先停止Server，再停止Monitor
     StopServers();
