@@ -6,50 +6,18 @@
 #include "threadpool.h"
 #include "Storage.h"
 #include "Server.h"
+#include "Monitor.h"
 
 DEFINE_string(balancer, "random", "负载均衡算法，可选值：random, round, game, power");
 
-std::vector<std::unique_ptr<Server>> server_pool;
+// 服务端和客户端
+std::vector<std::shared_ptr<Server>> server_pool;
 std::vector<std::thread> clients;
-
-std::thread monitor;
-bool shutdown = false;
-
-/*
- * 监测线程的线程函数
- * 负责周期性打印每台服务器的的状态
- */
-void MonitorFunc()
-{
-    while (!shutdown)
-    {
-        for (const auto& server : server_pool)
-        {
-            server->PrintStatus();
-        }
-
-        if (shutdown)       // 如果执行PrintStatus()操作后，shutdown变化，可以立即跳出，无需等待sleep
-            return;
-
-        std::this_thread::sleep_for(std::chrono::seconds(1));
-    }
-}
-
-/*
- * 停止监测线程
- */
-void StopMonitor()
-{
-    shutdown = true;
-
-    if (monitor.joinable())
-        monitor.join();
-}
 
 /*
  * 负载均衡算法：随机
  */
-int SelectOnePoolRandom()
+int SelectOneServerRandom()
 {
     static int max = server_pool.size();
     return rand() % max;
@@ -90,9 +58,9 @@ int SelectOneServer()
 {
     if (FLAGS_balancer == "random" || FLAGS_balancer == "rand")
     {
-        return SelectOnePoolRandom();
+        return SelectOneServerRandom();
     } else if (FLAGS_balancer == "round") {
-
+        return SelectOneServerRoundRobin();
     }
 
 }
@@ -113,9 +81,7 @@ void SendRequest()
 
 
     std::string log;
-    log =  "Task # ---> pool[" + std::to_string(offset) + "]";
 
-//    LOG(INFO) << log;
     server_pool[offset]->Execute(task);  // 由上一步选择的服务器处理生成的请求
 }
 
@@ -164,7 +130,8 @@ int main(int argc, char* argv[])
     // 初始化服务端
     InitPools(1);
 
-    monitor = std::thread(MonitorFunc);
+    // 初始化监测器
+    Monitor::Instance().Init(server_pool);
 
     // 初始化客户端
     InitClients();
@@ -176,9 +143,9 @@ int main(int argc, char* argv[])
     // 先停止Server，再停止Monitor
     // 顺序不要颠倒，否则在等待Server停止的过程中没有日志输出
     StopServers();
-    StopMonitor();
+    Monitor::Instance().Stop();
 
-
+    // 停止glog
     google::ShutdownGoogleLogging();
 
     return 0;
