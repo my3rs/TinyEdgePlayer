@@ -2,6 +2,7 @@
 #define TINYEDGEPLAYER_SERVER_H
 
 #include <future>
+#include <thread>
 #include <glog/logging.h>
 
 #include "threadpool.h"
@@ -15,29 +16,65 @@ public:
 
     Server(int cpu, int ram, int id);
 
+    /*
+     * 停止Server
+     */
     void Stop();
 
-
+    /*
+     * 执行一个Task
+     */
     auto Execute(Task t) -> std::future<bool>;
 
 public:
-    int GetId() { return id_; }
-    double GetCpuLoad() { return cpu_.load(); }
-    int GetTaskQueueSize() { return cpu_.GetTaskQueueSize(); }
-    double GetCurrentSpeed() { return cpu_.GetCurrentSpeed_(); }
+    /*
+     * 获得服务器ID
+     */
+    int     GetId() { return id_; }
 
-    void PrintStatus();
+    /*
+     * 获得CPU负载
+     */
+    double  GetCpuLoad() { return cpu_.load(); }
 
-    std::string GetStatusLogString();
-    void GcFunc();
+    /*
+     * 获得近期的平均任务队列长度
+     */
+    int     GetTaskQueueSize() { return cpu_.GetTaskQueueSize(); }
+
+    /*
+     * 获得近期的处理速度
+     */
+    double  GetCurrentSpeed() { return cpu_.GetCurrentSpeed_(); }
+
+    /*
+     * 打印日志
+     */
+    void    PrintStatus();
+
+
+
 
 private:
-    int         id_;
-    ThreadPool  cpu_;
-    Storage     storage_;
+    int         id_;        // 服务器序号
+    ThreadPool  cpu_;       // 计算资源
+    Storage     storage_;   // 存储资源
 
-    bool        shutdown_;
-    RateLimiter rate_limiter_;
+    std::thread game_thread_;   // 博弈线程
+    bool        shutdown_;      // 用来控制GC线程和博弈的停止。cpu_自己有结束标识，不用这个shutdown_
+    RateLimiter rate_limiter_;  // 限流器
+
+private:
+    /*
+     * 构造日志字符串并返回
+     */
+    std::string     GetStatusLogString_();
+
+    /*
+     * 控制本地资源管理的线程函数
+     * 不需要增加单独的线程，由cpu_来执行它即可
+     */
+    void    GcFunc();
 };
 
 
