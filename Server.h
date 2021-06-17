@@ -3,6 +3,8 @@
 
 #include <future>
 #include <thread>
+#include <random>
+#include <chrono>
 #include <glog/logging.h>
 
 #include "threadpool.h"
@@ -76,6 +78,9 @@ private:
      */
     void    GcFunc();
 };
+
+
+std::shared_ptr<Server> CreateOneServer(int id);
 
 
 #endif //TINYEDGEPLAYER_SERVER_H

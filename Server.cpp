@@ -71,3 +71,15 @@ void Server::GcFunc()
         std::this_thread::sleep_for(std::chrono::milliseconds(g_config.GcInterval));
     }
 }
+
+
+std::shared_ptr<Server> GenerateOneServer(int id)
+{
+    static auto seed = std::chrono::steady_clock::now().time_since_epoch().count();
+    static std::default_random_engine engine(seed);
+
+    static std::uniform_int_distribution u_cpu(1, 8);
+    static std::uniform_int_distribution u_ram(512, 10240);
+
+    return std::make_shared<Server>(u_cpu(engine), u_ram(engine), id);
+}

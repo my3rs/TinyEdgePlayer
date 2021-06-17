@@ -45,11 +45,15 @@ int SelectOneServerRoundRobin()
     return offset ++;
 }
 
-void InitPools(int count)
+/*
+ * 按照命令行参数指定的数量对服务器池进行初始化
+ */
+void InitPools()
 {
-    server_pool.emplace_back(new Server(1, 512, 1));
-    server_pool.emplace_back(new Server(2, 1024, 2));
-    server_pool.emplace_back(new Server(3, 1536, 3));
+    for (int i = 0; i < FLAGS_server; ++ i)
+    {
+        server_pool.emplace_back(CreateOneServer(i));
+    }
 }
 
 void StopServers()
@@ -119,7 +123,7 @@ void InitClients()
  */
 void StopClients()
 {
-    shutdown = true;
+    shutdown = true;    // 先将shutdown置为true以尽快结束client
 
     for (auto& t : clients)
     {
@@ -130,6 +134,9 @@ void StopClients()
     LOG(INFO) << "All clients stopped.";
 }
 
+/*
+ * “优雅”地退出程序，无论收到了什么信号
+ */
 void ExitGracefully(int signum = 0) // 异常退出不应该走这个流程
 {
     // 停止客户端
@@ -146,6 +153,9 @@ void ExitGracefully(int signum = 0) // 异常退出不应该走这个流程
     exit(signum);
 }
 
+/*
+ * 信号 SIGING, SIGABRT 的 Handler
+ */
 void AbnormalSignalHandler(int signum)
 {
     LOG(ERROR) << "Interrupt signal (" << signum << ") received. Exiting now...";
@@ -172,7 +182,7 @@ int main(int argc, char* argv[])
     signal(SIGABRT, AbnormalSignalHandler);
 
     // 初始化服务端
-    InitPools(1);
+    InitPools();
 
     // 初始化监测器
     Monitor::Instance().Init(server_pool);
