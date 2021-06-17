@@ -1,5 +1,6 @@
 #include <iostream>
 #include <vector>
+#include <csignal>
 #include <glog/logging.h>
 #include <gflags/gflags.h>
 
@@ -9,18 +10,27 @@
 #include "Monitor.h"
 
 DEFINE_string(balancer, "random", "负载均衡算法，可选值：random, round, game, power");
+DEFINE_int32(server, 5, "服务器数量，默认为5");
+DEFINE_int32(client, 5, "客户端数量，默认为5");
+DEFINE_int32(request, 100, "每个客户端发送的请求数量，默认为100");
 
 // 服务端和客户端
 std::vector<std::shared_ptr<Server>> server_pool;
 std::vector<std::thread> clients;
+bool shutdown = false;      // 控制客户端退出，多个进程间共享即可。只有主进程会对它进行修改
+
 
 /*
  * 负载均衡算法：随机
  */
 int SelectOneServerRandom()
 {
+    static auto seed = std::chrono::steady_clock::now().time_since_epoch().count();
+    static std::default_random_engine engine(seed);
     static int max = server_pool.size();
-    return rand() % max;
+    static std::uniform_int_distribution u(0, max - 1);     // 注意-1，生成的随机数区间为[min, max]闭区间
+
+    return u(engine);
 }
 
 /*
@@ -62,7 +72,6 @@ int SelectOneServer()
     } else if (FLAGS_balancer == "round") {
         return SelectOneServerRoundRobin();
     }
-
 }
 
 /*
@@ -90,11 +99,14 @@ void SendRequest()
  */
 void InitClients()
 {
-    for (int j = 0; j < 500; ++ j)
+    for (int j = 0; j < FLAGS_client; ++ j)
     {
         clients.emplace_back(std::thread([](){
-            for (int i = 0; i < 10; ++ i)
+            for (int i = 0; i < FLAGS_request; ++ i)
             {
+                if (shutdown)
+                    return;
+
                 SendRequest();
                 std::this_thread::sleep_for(std::chrono::milliseconds(20));
             }
@@ -107,12 +119,41 @@ void InitClients()
  */
 void StopClients()
 {
+    shutdown = true;
+
     for (auto& t : clients)
     {
         if (t.joinable())
             t.join();
     }
+
+    LOG(INFO) << "All clients stopped.";
 }
+
+void ExitGracefully(int signum = 0) // 异常退出不应该走这个流程
+{
+    // 停止客户端
+    StopClients();
+
+    // 先停止Server，再停止Monitor
+    // 顺序不要颠倒，否则在等待Server停止的过程中没有日志输出
+    StopServers();
+    Monitor::Instance().Stop();
+
+    // 停止glog
+    google::ShutdownGoogleLogging();
+
+    exit(signum);
+}
+
+void AbnormalSignalHandler(int signum)
+{
+    LOG(ERROR) << "Interrupt signal (" << signum << ") received. Exiting now...";
+
+    ExitGracefully(signum);
+}
+
+
 
 int main(int argc, char* argv[])
 {
@@ -127,6 +168,9 @@ int main(int argc, char* argv[])
 
     srand(time(nullptr));
 
+    signal(SIGINT, AbnormalSignalHandler);
+    signal(SIGABRT, AbnormalSignalHandler);
+
     // 初始化服务端
     InitPools(1);
 
@@ -136,17 +180,6 @@ int main(int argc, char* argv[])
     // 初始化客户端
     InitClients();
 
-    // 停止客户端
-    StopClients();
 
-
-    // 先停止Server，再停止Monitor
-    // 顺序不要颠倒，否则在等待Server停止的过程中没有日志输出
-    StopServers();
-    Monitor::Instance().Stop();
-
-    // 停止glog
-    google::ShutdownGoogleLogging();
-
-    return 0;
+    ExitGracefully(0);
 }
