@@ -20,12 +20,12 @@ struct Task
 /*
  * 生成随机的任务时间，单位为ms
  */
-int GenerateRandomTime();
+static int GenerateRandomTime();
 
 /*
  * 生成随机的任务存储开销，单位为MB
  */
-int GenerateRandomStorage();
+static int GenerateRandomStorage();
 
 /*
  * 生成随机的任务请求
