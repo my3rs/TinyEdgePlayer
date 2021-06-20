@@ -53,7 +53,6 @@ private:
 private:
     unsigned                cnt_threads_;
     std::deque<std::thread> worker_threads;             // 线程池中的线程
-//    std::thread             monitor_;
 
 
     std::mutex              mutex_;
@@ -61,7 +60,7 @@ private:
     bool                    shutdown_;
     std::deque<std::function<void ()>>  tasks_; // 任务队列
 
-    std::atomic<unsigned>   cnt_tasks_1_sec_;
+    std::atomic<unsigned>   tasks_completed_in_one_second_;
 
     std::queue<int>         speeds_;
     std::queue<int>         task_queue_size_;
