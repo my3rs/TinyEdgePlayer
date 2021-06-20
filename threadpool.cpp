@@ -4,14 +4,16 @@ ThreadPool::ThreadPool(unsigned int threads_cnt)
         :  cnt_threads_(threads_cnt),
         shutdown_(false)
 {
+    // 线程数量最少为2
+    // 一个执行MonitorRoutine()，一个执行WorkerRoutine()
     if (threads_cnt <= 1 || threads_cnt >= 10)
     {
         threads_cnt = 2;
         LOG(ERROR) << "线程数量不合法，已初始化为2个线程";
     }
 
-    // 多出来两个线程做其他任务
-    for (unsigned i = 0; i < cnt_threads_ + 2; ++ i)
+    // 多出来一个线程作为monitor
+    for (unsigned i = 0; i < cnt_threads_ + 1; ++ i)
     {
         std::thread t([this](){this->_WorkerRoutine();});
         worker_threads.emplace_back(std::move(t));
@@ -26,7 +28,7 @@ ThreadPool::~ThreadPool()
 
 double ThreadPool::load() const
 {
-    return  GetTaskQueueSize() / GetCurrentSpeed_(); // 至少有两个线程负载垃圾回收等任务
+    return  GetTaskQueueSize() / GetCurrentSpeed_(); 
 }
 
 
@@ -81,7 +83,7 @@ void ThreadPool::_WorkerRoutine()
 
         task();
 
-        cnt_tasks_1_sec_ ++;
+        tasks_completed_in_one_second_ ++;
     }
 }
 
@@ -97,10 +99,10 @@ void ThreadPool::_MonitorRoutine()
 
         std::this_thread::sleep_for(std::chrono::seconds(1));
 
-        if (cnt_tasks_1_sec_ == 0 || tasks_.size() == 0)
+        if (tasks_completed_in_one_second_ == 0 || tasks_.size() == 0)
             continue;
 
-        speeds_.push(cnt_tasks_1_sec_);
+        speeds_.push(tasks_completed_in_one_second_);
         if (speeds_.size() > 3)
             speeds_.pop();
 
@@ -108,7 +110,7 @@ void ThreadPool::_MonitorRoutine()
         if (task_queue_size_.size() > 3)
             task_queue_size_.pop();
 
-        cnt_tasks_1_sec_ = 0;
+        tasks_completed_in_one_second_ = 0;
     }
 }
 
