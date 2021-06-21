@@ -96,6 +96,23 @@ void StopServers()
 
 
 /*
+* 打印状态信息，包括：
+* 命令行参数
+*/
+void PrintStatus()
+{
+    std::string log_string = "------------命令行参数-------------\n";
+
+    log_string += "服务器数量：" + std::to_string(FLAGS_server) + "\n";
+    log_string += "客户端数量：" + std::to_string(FLAGS_client) + "\n";
+    log_string += "负载均衡算法：" + FLAGS_balancer + "\n";
+
+    log_string + "-----------------------------------";
+
+    LOG(INFO) << log_string;
+}
+
+/*
  * 在客户端完成任务后，停止所有客户端
  */
 void WaitForClientsToEnd()
@@ -148,22 +165,7 @@ void AbnormalSignalHandler(int signum)
     ExitGracefully(signum);
 }
 
-/*
-* 打印状态信息，包括：
-* 命令行参数
-*/
-void PrintStatus()
-{
-    std::string log_string = "------------命令行参数-------------\n";
 
-    log_string += "服务器数量：" + std::to_string(FLAGS_server) + "\n";
-    log_string += "客户端数量：" + std::to_string(FLAGS_client) + "\n";
-    log_string += "负载均衡算法：" + FLAGS_balancer + "\n";
-
-    log_string + "-----------------------------------";
-
-    LOG(INFO) << log_string;
-}
 
 /*
 * 程序入口

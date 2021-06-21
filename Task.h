@@ -18,8 +18,11 @@ struct Task
 };
 
 
-/* 记录生成的任务数量 */
-static int counter;
+/* 
+* 记录生成的任务数量 
+* 只有主线程访问
+*/
+static int counter; 
 
 /*
  * 生成随机的任务时间，单位为ms
