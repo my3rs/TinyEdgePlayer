@@ -1,5 +1,7 @@
 #include "Server.h"
 
+#include "config.h"
+
 Server::Server(int cpu, int ram, int id)
     : cpu_(cpu + 1),        // 多出一个线程用来执行“本地资源管理"
         storage_(ram), id_(id),
@@ -63,7 +65,9 @@ void Server::GcFunc()
     {
         Execute(Task(Config::kGcTime, 0));
         storage_.Free(Config::kGcSize);
-        LOG(INFO) << "Freed " << Config::kGcSize << "MB RAM";
+
+        if (g_config.Verbose)
+            LOG(INFO) << "Freed " << Config::kGcSize << "MB RAM";
 
         if (shutdown_)
             return;
