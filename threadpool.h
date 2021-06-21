@@ -13,10 +13,10 @@
 class ThreadPool
 {
 public:
-    ThreadPool() = delete ;
     explicit ThreadPool(unsigned thread_count);
     ~ThreadPool();
 
+    ThreadPool() = delete;
     ThreadPool(const ThreadPool&) = delete;
     void operator=(const ThreadPool&) = delete;
 

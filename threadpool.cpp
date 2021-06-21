@@ -99,15 +99,26 @@ void ThreadPool::_MonitorRoutine()
 
         std::this_thread::sleep_for(std::chrono::seconds(1));
 
+        // 后面这个if内的代码是为了保证
+        // “线程处理速度”和“任务队列长度”两个指标的值不为0
         if (tasks_completed_in_one_second_ == 0 || tasks_.size() == 0)
-            continue;
+        {
+            speeds_.push(1);
+            task_queue_size_.push(1);
+
+            // 不用判断speeds_和task_queue_size_的长度是不是大于3
+            // 直接进入到下一轮多pop一次就好
+
+            continue;   // 一定要跳过本次循环
+        }
+            
 
         speeds_.push(tasks_completed_in_one_second_);
-        if (speeds_.size() > 3)
+        while (speeds_.size() > 3)  // 别用if
             speeds_.pop();
 
         task_queue_size_.push(tasks_.size() + 2);
-        if (task_queue_size_.size() > 3)
+        while (task_queue_size_.size() > 3) // 别用if
             task_queue_size_.pop();
 
         tasks_completed_in_one_second_ = 0;
