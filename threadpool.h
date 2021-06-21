@@ -39,7 +39,14 @@ public:
     auto ExecuteTask(F&& f, Args&&... args)
         -> std::future<typename std::result_of<F (Args...)>::type>;
 
+    /* 
+     * get 最近三个周期内的处理速度平均值 
+     */
     double GetCurrentSpeed_() const;
+
+    /*
+     * get 最近三个周期内的等待队列平均长度 
+     */
     int GetTaskQueueSize() const;
 
 private:
@@ -47,6 +54,10 @@ private:
      * worker 线程函数
      */
     void _WorkerRoutine();
+
+    /* 
+     * monitor 线程函数
+     */
     void _MonitorRoutine();
 
 

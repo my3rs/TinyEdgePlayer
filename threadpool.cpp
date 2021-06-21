@@ -151,6 +151,7 @@ double ThreadPool::GetCurrentSpeed_() const
 int ThreadPool::GetTaskQueueSize() const
 {
     std::queue<int> tmp(task_queue_size_);
+
     int sum = 0;
     unsigned n = tmp.size();
 
