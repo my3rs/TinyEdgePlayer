@@ -24,7 +24,8 @@ public:
     void Stop();
 
     /**
-     * 执行一个Task
+     * 异步执行一个Task
+     * @return 包含“Task是否成功执行（是为true，反之false）”的future
      */
     auto Execute(Task t) -> std::future<bool>;
 

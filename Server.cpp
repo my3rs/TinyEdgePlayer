@@ -73,7 +73,7 @@ void Server::GcFunc()
 }
 
 
-std::shared_ptr<Server> GenerateOneServer(int id)
+std::shared_ptr<Server> CreateOneServer(int id)
 {
     static auto seed = std::chrono::steady_clock::now().time_since_epoch().count();
     static std::default_random_engine engine(seed);
