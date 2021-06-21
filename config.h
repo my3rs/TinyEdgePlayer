@@ -5,10 +5,12 @@ struct GlobalConfig
 {
     GlobalConfig()
     {
+        Verbose = false;
         GameMode = true;
         GcInterval = 1000;
     }
 
+    bool Verbose;
     bool GameMode;
     int GcInterval;
 };
