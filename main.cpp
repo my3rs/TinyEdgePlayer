@@ -1,6 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <csignal>
+
 #include <glog/logging.h>
 #include <gflags/gflags.h>
 
@@ -48,8 +49,8 @@ void SendRequest()
 
     int offset = Balancer::Instance().SelectOneServer();     // 选择处理请求的服务器
 
-    if (FLAGS_verbose)
-        LOG(INFO) << "Select Server[" << offset << "]";
+    //if (g_config.Verbose)
+    //    LOG(INFO) << "Select Server[" << offset << "]";
 
 
     std::ostringstream client_id;
@@ -126,6 +127,11 @@ void ExitGracefully(int signum = 0) // 异常退出不应该走这个流程
     StopServers();
     Monitor::Instance().Stop();
 
+    // 打印统计信息
+    Balancer::Instance().PrintStatistics();
+    task::PrintStatistics();
+    PrintStatus();
+
     // 停止glog
     google::ShutdownGoogleLogging();
 
@@ -142,6 +148,22 @@ void AbnormalSignalHandler(int signum)
     ExitGracefully(signum);
 }
 
+/*
+* 打印状态信息，包括：
+* 命令行参数
+*/
+void PrintStatus()
+{
+    std::string log_string = "------------命令行参数-------------\n";
+
+    log_string += "服务器数量：" + std::to_string(FLAGS_server) + "\n";
+    log_string += "客户端数量：" + std::to_string(FLAGS_client) + "\n";
+    log_string += "负载均衡算法：" + FLAGS_balancer + "\n";
+
+    log_string + "-----------------------------------";
+
+    LOG(INFO) << log_string;
+}
 
 /*
 * 程序入口
@@ -155,6 +177,9 @@ int main(int argc, char* argv[])
     google::InitGoogleLogging(argv[0]);
     FLAGS_logtostderr = true;
     FLAGS_log_prefix = false;
+
+    if (FLAGS_verbose)
+        g_config.Verbose = true;
 
     // 注册手动停止程序的信号handler
     signal(SIGINT, AbnormalSignalHandler);

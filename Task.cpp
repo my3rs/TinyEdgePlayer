@@ -1,6 +1,9 @@
 #include "Task.h"
 #include "config.h"
 
+#include <glog/logging.h>
+
+
 int GenerateRandomTime()
 {
     static auto seed = std::chrono::steady_clock::now().time_since_epoch().count();
@@ -21,5 +24,16 @@ int GenerateRandomStorage()
 
 Task GenerateRandomTask()
 {
+    counter ++;
     return Task(GenerateRandomTime(), GenerateRandomStorage());
+}
+
+
+namespace task
+{
+    void PrintStatistics()
+    {
+        std::string log_string = "TaskGenerator: generated " + std::to_string(counter) + " tasks";
+        LOG(INFO) << log_string;
+    }
 }

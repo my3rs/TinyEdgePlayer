@@ -17,6 +17,10 @@ struct Task
     Task(int t, int s) : time(t), storage(s) {}
 };
 
+
+/* 记录生成的任务数量 */
+static int counter;
+
 /*
  * 生成随机的任务时间，单位为ms
  */
@@ -31,5 +35,11 @@ static int GenerateRandomStorage();
  * 生成随机的任务请求
  */
 Task GenerateRandomTask();
+
+
+namespace task
+{
+    void PrintStatistics();
+}
 
 #endif //TINYEDGEPLAYER_TASK_H

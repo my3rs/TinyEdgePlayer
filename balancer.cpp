@@ -2,6 +2,7 @@
 
 #include <random>
 #include <chrono>
+#include <string>
 
 Balancer::Balancer()
 	: lb_algorithm_(LoadBalanceAlgorithm::Random)
@@ -16,6 +17,12 @@ Balancer& Balancer::Instance()
 void Balancer::Init(const std::vector<std::shared_ptr<Server>>& server_pool)
 {
 	servers_ = server_pool;
+
+	// 初始化计数器
+	for (int i = 0; i < servers_.size(); ++i)
+	{
+		counter_[i] = 0;
+	}
 }
 
 void Balancer::SetLoadBlanceAlgorithm(LoadBalanceAlgorithm a)
@@ -62,18 +69,44 @@ int Balancer::SelectServerGame_()
 
 int Balancer::SelectOneServer()
 {
+	int offset = 0;
+
 	switch (lb_algorithm_)
 	{
 	case LoadBalanceAlgorithm::Game:
-		return SelectServerGame_();
+		offset = SelectServerGame_();
+		break;
 
 	case LoadBalanceAlgorithm::Power:
-		return SelectServerPower_();
+		offset = SelectServerPower_();
+		break;
 
 	case LoadBalanceAlgorithm::RoundRobin:
-		return SelectServerRoundRobin_();
+		offset = SelectServerRoundRobin_();
+		break;
 
 	default:	// 默认使用随机算法
-		return SelectServerRandom_();
+		offset = SelectServerRandom_();
+		break;
 	}
+
+	counter_[offset] ++;
+
+	return offset;
+}
+
+void Balancer::PrintStatistics()
+{
+	int sum_task = 0;
+	std::string log_string = "=================================Statistics======================================\n";
+
+	for (const auto& item : counter_)
+	{
+		sum_task += item.second;
+		log_string += "Server[" + std::to_string(item.first) + "] - " + std::to_string(item.second) + "\n";
+	}
+
+	log_string += "SUM - " + std::to_string(sum_task);
+
+	LOG(INFO) << log_string;
 }

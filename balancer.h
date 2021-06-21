@@ -33,10 +33,17 @@ public:
 	*/
 	int SelectOneServer();
 
+	/* 
+	* 打印统计信息，包括：
+	* 每个服务器处理的请求数量
+	*/
+	void PrintStatistics();
+
 
 private:
-	LoadBalanceAlgorithm lb_algorithm_;
-	std::vector<std::shared_ptr<Server>> servers_;
+	LoadBalanceAlgorithm				lb_algorithm_;	// 负载均衡算法
+	std::vector<std::shared_ptr<Server>> servers_;		// server pool
+	std::unordered_map<int, int>		counter_;		// 计数器，用来统计每个服务器处理多少请求
 
 
 private:
