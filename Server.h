@@ -55,11 +55,20 @@ public:
      */
     void    PrintStatus();
 
+    /*
+    * set 权重
+    */
+    void    SetWeight(int w);
 
+    /*
+    * get 权重
+    */
+    int     GetWeight();
 
 
 private:
     int         id_;        // 服务器序号
+    int         weight_;    // 权重
     ThreadPool  cpu_;       // 计算资源
     Storage     storage_;   // 存储资源
 

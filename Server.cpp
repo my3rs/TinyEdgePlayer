@@ -76,6 +76,16 @@ void Server::GcFunc()
     }
 }
 
+void Server::SetWeight(int w)
+{
+    weight_ = w;
+}
+
+int Server::GetWeight()
+{
+    return weight_;
+}
+
 
 std::shared_ptr<Server> CreateOneServer(int id)
 {
