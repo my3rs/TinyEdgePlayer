@@ -36,9 +36,14 @@ public:
     int     GetId() { return id_; }
 
     /**
-     * 获得CPU负载
+     * 获得CPU使用率
      */
     double  GetCpuLoad() { return cpu_.load(); }
+
+    /*
+    * 获得RAM使用率
+    */
+    double  GetRamLoad() { return storage_.load(); }
 
     /**
      * 获得近期的平均任务队列长度
@@ -68,7 +73,7 @@ public:
 
 private:
     int         id_;        // 服务器序号
-    int         weight_;    // 权重
+    int         weight_;    // 权重，默认值 1
     ThreadPool  cpu_;       // 计算资源
     Storage     storage_;   // 存储资源
 
