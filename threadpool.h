@@ -73,8 +73,8 @@ private:
 
     std::atomic<unsigned>   tasks_completed_in_one_second_;
 
-    std::queue<int>         speeds_;
-    std::queue<int>         task_queue_size_;
+    std::deque<int>         speeds_;
+    std::deque<int>         task_queue_size_;
 };
 
 template<typename F, typename... Args>

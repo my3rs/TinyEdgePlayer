@@ -1,5 +1,7 @@
 #include "threadpool.h"
 
+#include <numeric>
+
 ThreadPool::ThreadPool(unsigned int threads_cnt)
         :  cnt_threads_(threads_cnt),
         shutdown_(false)
@@ -103,8 +105,8 @@ void ThreadPool::_MonitorRoutine()
         // “线程处理速度”和“任务队列长度”两个指标的值不为0
         if (tasks_completed_in_one_second_ == 0 || tasks_.size() == 0)
         {
-            speeds_.push(1);
-            task_queue_size_.push(1);
+            speeds_.push_back(1);
+            task_queue_size_.push_back(1);
 
             // 不用判断speeds_和task_queue_size_的长度是不是大于3
             // 直接进入到下一轮多pop一次就好
@@ -113,13 +115,13 @@ void ThreadPool::_MonitorRoutine()
         }
             
 
-        speeds_.push(tasks_completed_in_one_second_);
+        speeds_.push_back(tasks_completed_in_one_second_);
         while (speeds_.size() > 3)  // 别用if
-            speeds_.pop();
+            speeds_.pop_front();
 
-        task_queue_size_.push(tasks_.size() + 2);
+        task_queue_size_.push_back(tasks_.size() + 2);
         while (task_queue_size_.size() > 3) // 别用if
-            task_queue_size_.pop();
+            task_queue_size_.pop_front();
 
         tasks_completed_in_one_second_ = 0;
     }
@@ -128,41 +130,34 @@ void ThreadPool::_MonitorRoutine()
 
 double ThreadPool::GetCurrentSpeed_() const
 {
-    std::queue<int> tmp(speeds_);
-    int sum = 0;
-    unsigned n = tmp.size();
-    if (n == 0 || n == 1)
+    std::deque<int> tmp(speeds_);
+
+    if (tmp.empty())
         return 1.0;
 
+    int sum = std::accumulate(tmp.begin(), tmp.end(), 0.0);
+    double mean = sum / tmp.size();
 
-    while (!tmp.empty())
-    {
-        sum += tmp.front();
-        tmp.pop();
+    if (mean < 1)
+    {   // 这个 if 应该永远不成立，因为 speeds_ 中不会有小于 1 的值存在
+        LOG(ERROR) << "Threadpool: speed < 1";
+        return 1.0;
     }
-
-    double result = 1.0 * sum / n;
-    if (result < 1)
-        return 1;
     else
-        return result;
+    {
+        return mean;
+    }
 }
 
 int ThreadPool::GetTaskQueueSize() const
 {
-    std::queue<int> tmp(task_queue_size_);
+    std::deque<int> tmp(task_queue_size_);
 
-    int sum = 0;
-    unsigned n = tmp.size();
-
-    while (!tmp.empty())
-    {
-        sum += tmp.front();
-        tmp.pop();
-    }
-
-    if (sum == 0)
+    if (tmp.empty())
         return 0;
 
-    return sum / n;
+    int sum = std::accumulate(tmp.begin(), tmp.end(), 0.0);
+    double mean = sum / tmp.size();
+
+    return mean;
 }
