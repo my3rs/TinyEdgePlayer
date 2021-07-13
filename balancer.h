@@ -4,6 +4,8 @@
 #include <vector>
 #include "Server.h"
 
+using ServerPtr = std::shared_ptr<Server>;
+
 enum class LoadBalanceAlgorithm
 {
 	Random,
@@ -20,6 +22,10 @@ public:
 	*/
 	static Balancer& Instance();
 
+	/*
+	* 初始化 Balancer
+	* 1.计数器；
+	*/
 	void Init(const std::vector<std::shared_ptr<Server>>& server_pool);
 
 	/* 
@@ -31,7 +37,7 @@ public:
 	/*
 	* 根据lb_algorithm_选择一个服务器
 	*/
-	int SelectOneServer();
+	std::shared_ptr<Server> SelectOneServer();
 
 	/* 
 	* 打印统计信息，包括：
@@ -41,36 +47,46 @@ public:
 
 
 private:
-	LoadBalanceAlgorithm				lb_algorithm_;	// 负载均衡算法
-	std::vector<std::shared_ptr<Server>> servers_;		// server pool
-	std::unordered_map<int, int>		counter_;		// 计数器，用来统计每个服务器处理多少请求
-
+	LoadBalanceAlgorithm				lb_algorithm_;	// 负载均衡算法，默认为随机算法
+	std::vector<ServerPtr>				servers_;		// server pool
+	std::unordered_map<ServerPtr, int>	counter_;		// 计数器，用来统计每个服务器处理多少请求
+	std::vector<ServerPtr>				server_queue_;	// 服务器队列，存储的值为服务器在`servers_`中的角标
+	bool								is_server_queue_ready_;		// 标记`server_queue_`是否可用，默认应该置为false
 
 private:
+	/*
+	* 单例模式，私有化构造函数
+	*/
 	Balancer();
-
-
-	// TODO: power、game算法还没有实现
 
 	/*
 	* 负载均衡算法：Round Robin
 	*/
-	int SelectServerRoundRobin_();
+	ServerPtr SelectServerRoundRobin_();
 
 	/*
 	* 负载均衡算法：Random
 	*/
-	int SelectServerRandom_();
+	ServerPtr SelectServerRandom_();
 
 	/*
 	* 负载均衡算法：Power of k choices
 	*/
-	int SelectServerPower_();
+	ServerPtr SelectServerPower_();
 
 	/*
 	* 本文实现的负载均衡算法：Game
 	*/
-	int SelectServerGame_();
+	ServerPtr SelectServerGame_();
+
+
+	/*
+	 * 更新服务器队列server_queue_
+	 * 更新过程中`is_server_queue_ready_`的值应该为false
+	 * 更新完成后`is_server_queue_ready_`的值应该为true
+	 */
+	void UpdateServerQueue_();
+
 	
 };
 

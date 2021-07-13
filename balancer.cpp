@@ -3,9 +3,12 @@
 #include <random>
 #include <chrono>
 #include <string>
+#include <numeric>
+#include <algorithm>
 
 Balancer::Balancer()
-	: lb_algorithm_(LoadBalanceAlgorithm::Random)
+	: lb_algorithm_(LoadBalanceAlgorithm::Random),
+	  is_server_queue_ready_(false)
 {}
 
 Balancer& Balancer::Instance()
@@ -19,9 +22,9 @@ void Balancer::Init(const std::vector<std::shared_ptr<Server>>& server_pool)
 	servers_ = server_pool;
 
 	// 初始化计数器
-	for (int i = 0; i < servers_.size(); ++i)
+	for (const auto& s : servers_)
 	{
-		counter_[i] = 0;
+		counter_[s] = 0;
 	}
 }
 
@@ -36,63 +39,152 @@ LoadBalanceAlgorithm Balancer::GetLoadBlanceAlgorithm()
 }
 
 
-int Balancer::SelectServerRoundRobin_()
+void Balancer::UpdateServerQueue_()
+{
+	is_server_queue_ready_ = false;
+
+	std::vector<int>	initial_weight;		// 真实权重
+	std::vector<int>	current_weight;		// 临时权重
+
+	for (const auto& s : servers_)
+	{
+		initial_weight.emplace_back(s->GetWeight());
+		current_weight.emplace_back(s->GetWeight());
+	}
+
+	int sum_weight = std::accumulate(current_weight.begin(), current_weight.end(), 0);
+
+	while (true)
+	{
+		// 找到临时权重的最大值和拥有该权重的服务器
+		auto max_weight_iter = std::max_element(current_weight.begin(), current_weight.end());
+		auto max_server_iter = servers_.begin();
+		std::advance(max_server_iter, std::distance(current_weight.begin(), max_weight_iter));
+
+		server_queue_.emplace_back(*max_server_iter);
+
+		(*max_weight_iter) -= sum_weight;
+
+		if (server_queue_.size() == sum_weight)
+			break;
+
+		for (int i = 0; i < current_weight.size(); ++i)
+		{
+			current_weight[i] += initial_weight[i];
+		}
+	}
+
+	is_server_queue_ready_ = true;
+}
+
+ServerPtr Balancer::SelectServerRoundRobin_()
 {
 	static int offset;
 	if (offset >= servers_.size())
 		offset = 0;
 
-	return offset++;
+	return servers_[offset++];
 }
 
-int Balancer::SelectServerRandom_()
+ServerPtr Balancer::SelectServerRandom_()
 {
 	static auto seed = std::chrono::steady_clock::now().time_since_epoch().count();
 	static std::default_random_engine engine(seed);
 	static int max = servers_.size();
 	static std::uniform_int_distribution u(0, max - 1);     // 注意-1，生成的随机数区间为[min, max]闭区间
 
-	return u(engine);
+	return servers_[u(engine)];
 }
 
-int Balancer::SelectServerPower_()
+ServerPtr Balancer::SelectServerPower_()
 {
-	// todo: 实现power算法
-	return 0;
+	static auto seed = std::chrono::steady_clock::now().time_since_epoch().count();
+	static std::default_random_engine engine(seed);
+	static int max = servers_.size();
+	static std::uniform_int_distribution u(0, max - 1);     // 注意-1，生成的随机数区间为[min, max]闭区间
+
+	int first = u(engine);
+	int second = u(engine);
+
+	if (first == second)
+		return servers_[first];
+	else if (servers_[first]->GetCpuLoad() <= servers_[second]->GetCpuLoad())
+		return servers_[first];
+	else
+		return servers_[second];
 }
 
-int Balancer::SelectServerGame_()
+ServerPtr Balancer::SelectServerGame_()
 {
-	// todo: 实现game算法
-	return 0;
+	static int offset;
+
+	// 如果`server_queue_`没有准备好，需要处理几下情况：
+	// 1. 首次运行，`server_queue_`为空 -> 借用轮询算法，同时更新`server_quque_`；
+	// 2. 非首次运行，`server_queue_`正在被更新 -> 使用旧的服务队列；
+	if (!is_server_queue_ready_)
+	{
+		if (server_queue_.empty())	// 情况1：首次运行
+		{
+			std::thread t([this]() {
+				UpdateServerQueue_();
+				});
+			t.detach();
+
+			return SelectServerRoundRobin_();
+		}
+		else						// 情况2：非首次运行
+		{
+			if (offset == server_queue_.size())
+			{
+				offset = 0;
+				return server_queue_[offset];
+			}
+			return server_queue_[offset++];
+		}
+	}
+	// `server_queue_`准备好的情况
+	else
+	{
+		// 到达服务队列末尾
+		if (offset = server_queue_.size())
+		{
+			offset = 0;
+			return server_queue_[offset];
+		}
+		// 没到服务队列末尾，轮询`server_queue_`即可
+		else
+		{
+			return server_queue_[offset++];
+		}
+	}
 }
 
-int Balancer::SelectOneServer()
+ServerPtr Balancer::SelectOneServer()
 {
-	int offset = 0;
+	ServerPtr result;
 
 	switch (lb_algorithm_)
 	{
 	case LoadBalanceAlgorithm::Game:
-		offset = SelectServerGame_();
+		result = SelectServerGame_();
 		break;
 
 	case LoadBalanceAlgorithm::Power:
-		offset = SelectServerPower_();
+		result = SelectServerPower_();
 		break;
 
 	case LoadBalanceAlgorithm::RoundRobin:
-		offset = SelectServerRoundRobin_();
+		result = SelectServerRoundRobin_();
 		break;
 
 	default:	// 默认使用随机算法
-		offset = SelectServerRandom_();
+		result = SelectServerRandom_();
 		break;
 	}
 
-	counter_[offset] ++;
+	counter_[result] ++;
 
-	return offset;
+	return result;
 }
 
 void Balancer::PrintStatistics()
@@ -103,7 +195,7 @@ void Balancer::PrintStatistics()
 	for (const auto& item : counter_)
 	{
 		sum_task += item.second;
-		log_string += "Server[" + std::to_string(item.first) + "] - " + std::to_string(item.second) + "\n";
+		log_string += "Server[" + std::to_string(item.first->GetId()) + "] - " + std::to_string(item.second) + "\n";
 	}
 
 	log_string += "SUM - " + std::to_string(sum_task);
