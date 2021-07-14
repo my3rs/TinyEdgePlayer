@@ -41,7 +41,7 @@ namespace Config
     const unsigned kGcInterval = 1000;
 
     // 默认的限流参数，单位 QPS
-    const unsigned kDefaultRateLimit = 60;
+    const unsigned kDefaultRateLimit = 80;
 
     // 客户端发送请求的时间时隔，单位 ms
     const unsigned kRequestInterval = 20;
