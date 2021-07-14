@@ -38,7 +38,7 @@ public:
     /**
      * 获得CPU使用率
      */
-    double  GetCpuLoad() { return cpu_.load(); }
+    double  GetCpuLoad() { return cpu_.GetLoad(); }
 
     /*
     * 获得RAM使用率
@@ -53,7 +53,7 @@ public:
     /**
      * 获得近期的处理速度
      */
-    double  GetCurrentSpeed() { return cpu_.GetCurrentSpeed_(); }
+    double  GetCurrentSpeed() { return cpu_.GetCurrentSpeed(); }
 
     /**
      * 打印日志
@@ -70,11 +70,29 @@ public:
     */
     int     GetWeight();
 
+    /* get 算力 */
+    double  GetPower() { return cpu_.GetPower(); }
+
+    /* get 负载 */
+    double  GetLoad() { return cpu_.GetLoad(); }
+
+    /* get 最3次的平均负载 */
+    double  GetAverageLoad() { return cpu_.GetAverageLoad(); }
+
+    /* get 任务阻塞率 */
+    double GetBlockRate() { return cpu_.GetBlockRate(); }
+
+    /* get CPU核心数量 */
+    unsigned GetCpuCoreCount() { return cpu_core_count_; }
+
+    /* get RAM容量 */
+    unsigned GetRamSize() { return storage_.GetSize(); }
 
 private:
     int         id_;        // 服务器序号
     int         weight_;    // 权重，默认值 1
     ThreadPool  cpu_;       // 计算资源
+    unsigned    cpu_core_count_;    // 计算CPU核心数量，当前仅用于 GetCpuCount() 的返回值，无实际意义
     Storage     storage_;   // 存储资源
 
     std::thread game_thread_;   // 博弈线程

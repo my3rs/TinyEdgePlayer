@@ -7,7 +7,10 @@
 #include <functional>
 #include <future>
 #include <queue>
+#include <ctime>
+
 #include <glog/logging.h>
+
 
 
 class ThreadPool
@@ -25,39 +28,43 @@ public:
         shutdown_ = true;
     }
 
-    double  load() const;
 
-    /**
-     * 等待所有线程结束，然后关闭线程池
-     */
+    /* get 瞬时使用率 */
+    double  GetLoad() const;
+
+    /* get 平均使用率 */
+    double  GetAverageLoad() const;
+
+    /* get 算力 */
+    double  GetPower();
+
+
+
+    /* 等待所有线程结束，然后关闭线程池 */
     void JoinAll();
 
-    /**
-     * 向线程池中添加一个任务
-     */
+    /* 向线程池中添加一个任务 */
     template<typename F, typename... Args>
     auto ExecuteTask(F&& f, Args&&... args)
         -> std::future<typename std::result_of<F (Args...)>::type>;
 
-    /* 
-     * get 最近三个周期内的处理速度平均值 
-     */
-    double GetCurrentSpeed_() const;
+    /* get 最近三个周期内的处理速度平均值 */
+    double GetCurrentSpeed() const;
 
-    /*
-     * get 最近三个周期内的等待队列平均长度 
-     */
+    /* get 最近三个周期内的等待队列平均长度 */
     int GetTaskQueueSize() const;
 
+    /* get 阻塞率（平均值） */
+    double GetBlockRate();
+
+    /* get 线程数量 */
+    unsigned GetThreadCount();
+
 private:
-    /**
-     * worker 线程函数
-     */
+    /* worker 线程函数 */
     void _WorkerRoutine();
 
-    /* 
-     * monitor 线程函数
-     */
+    /* monitor 线程函数 */
     void _MonitorRoutine();
 
 
@@ -69,12 +76,19 @@ private:
     std::mutex              mutex_;
     std::condition_variable cond_;
     bool                    shutdown_;
+
+    /* 以下两个队列要同时操作进出 */
     std::deque<std::function<void ()>>  tasks_; // 任务队列
+    std::deque<clock_t>     task_enter_time_;   // 每一个任务的入队时间
 
-    std::atomic<unsigned>   tasks_completed_in_one_second_;
+    std::atomic<unsigned>   tasks_completed_in_one_second_;     // 1秒内完成的任务数量，每秒清除一次
+    std::atomic<unsigned>   blocked_tasks_in_one_second_;       // 没有在规定时间内完成的任务数量，每秒清除一次
+    std::deque<unsigned>    blocked_tasks_;     // 最近3次的阻塞任务数量
+    std::deque<unsigned>    speeds_;            // 最近3次的任务处理速度
+    std::deque<unsigned>    task_queue_size_;   // 最近3次的队列长度
+    std::deque<double>      loads_;             // 最近3次的线程池使用率
 
-    std::deque<int>         speeds_;
-    std::deque<int>         task_queue_size_;
+    double                  power_;             // 算力，初始值为线程池中的线程数量
 };
 
 template<typename F, typename... Args>
@@ -106,6 +120,8 @@ auto ThreadPool::ExecuteTask(F &&f, Args&&... args)
         }
     };
 
+    // 任务入队的同时进行计时
+    task_enter_time_.emplace_back(clock());
     tasks_.emplace_back(std::move(task));
 //    LOG(INFO) << "ThreadPool task size: " << tasks_.size();
 

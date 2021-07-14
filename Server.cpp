@@ -5,6 +5,8 @@
 Server::Server(int cpu, int ram, int id)
     : cpu_(cpu + 1),        // 多出一个线程用来执行“本地资源管理"
         storage_(ram), id_(id),
+        weight_(1),
+        cpu_core_count_(cpu + 1),
         rate_limiter_(Config::kDefaultRateLimit)
 {
     shutdown_ = false;

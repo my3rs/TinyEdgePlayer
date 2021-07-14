@@ -1,10 +1,12 @@
 #include "threadpool.h"
+#include "config.h"
 
 #include <numeric>
 
 ThreadPool::ThreadPool(unsigned int threads_cnt)
         :  cnt_threads_(threads_cnt),
-        shutdown_(false)
+        shutdown_(false),
+        power_(threads_cnt)
 {
     // 线程数量最少为2
     // 一个执行MonitorRoutine()，一个执行WorkerRoutine()
@@ -28,9 +30,9 @@ ThreadPool::~ThreadPool()
 {
 }
 
-double ThreadPool::load() const
+double ThreadPool::GetLoad() const
 {
-    return  GetTaskQueueSize() / GetCurrentSpeed_(); 
+    return  GetTaskQueueSize() / GetCurrentSpeed(); 
 }
 
 
@@ -78,9 +80,17 @@ void ThreadPool::_WorkerRoutine()
                 return;
             }
 
-
+            // 从任务队列移除一个任务的同时，必须同步移除一个 task_enter_time
             task = std::move(tasks_.front());
             tasks_.pop_front();
+
+            int time_dur = clock() - task_enter_time_.front() / CLOCKS_PER_SEC * 1000;
+            task_enter_time_.pop_front();
+
+            if (time_dur >= Config::kLatencyThreshold)
+            {
+                blocked_tasks_in_one_second_++;
+            }
         }
 
         task();
@@ -100,6 +110,19 @@ void ThreadPool::_MonitorRoutine()
         }
 
         std::this_thread::sleep_for(std::chrono::seconds(1));
+
+        /* 1. load */
+        loads_.push_back(GetLoad());
+        while (loads_.size() > 3)
+            loads_.pop_front();
+
+        /* 2. 阻塞的任务数量 */
+        blocked_tasks_.push_back(blocked_tasks_in_one_second_);
+        blocked_tasks_in_one_second_ = 0;
+        while (blocked_tasks_.size() > 3)
+            blocked_tasks_.pop_front();
+
+        /* 3. speed 和 task queue size */
 
         // 后面这个if内的代码是为了保证
         // “线程处理速度”和“任务队列长度”两个指标的值不为0
@@ -128,14 +151,14 @@ void ThreadPool::_MonitorRoutine()
 }
 
 
-double ThreadPool::GetCurrentSpeed_() const
+double ThreadPool::GetCurrentSpeed() const
 {
-    std::deque<int> tmp(speeds_);
+    std::deque<unsigned> tmp(speeds_);
 
     if (tmp.empty())
         return 1.0;
 
-    int sum = std::accumulate(tmp.begin(), tmp.end(), 0.0);
+    unsigned sum = std::accumulate(tmp.begin(), tmp.end(), 0.0);
     double mean = sum / tmp.size();
 
     if (mean < 1)
@@ -151,13 +174,51 @@ double ThreadPool::GetCurrentSpeed_() const
 
 int ThreadPool::GetTaskQueueSize() const
 {
-    std::deque<int> tmp(task_queue_size_);
+    std::deque<unsigned> tmp(task_queue_size_);
 
     if (tmp.empty())
         return 0;
 
-    int sum = std::accumulate(tmp.begin(), tmp.end(), 0.0);
+    unsigned sum = std::accumulate(tmp.begin(), tmp.end(), 0.0);
     double mean = sum / tmp.size();
 
     return mean;
+}
+
+
+double ThreadPool::GetAverageLoad() const
+{
+    std::deque<double> tmp(loads_);
+
+    if (tmp.empty())
+        return 0;
+
+    double sum = std::accumulate(tmp.begin(), tmp.end(), 0.0);
+    double mean = sum / tmp.size();
+
+    return mean;
+}
+
+double ThreadPool::GetPower()
+{
+    // 每次调用都会计算新值
+    // 所以该函数不应该频繁被调用？
+    power_ = 0.37 * power_ + 0.63 * (GetCurrentSpeed() / GetTaskQueueSize());   // 指数移动平均
+    return power_;
+}
+
+
+double ThreadPool::GetBlockRate()
+{
+    std::deque<unsigned> tmp(blocked_tasks_);
+
+    unsigned sum = std::accumulate(tmp.begin(), tmp.end(), 0.0);
+    double mean = sum / tmp.size();
+
+    return mean / GetCurrentSpeed();
+}
+
+unsigned ThreadPool::GetThreadCount()
+{
+    return worker_threads.size();
 }
