@@ -84,7 +84,7 @@ void ThreadPool::_WorkerRoutine()
             task = std::move(tasks_.front());
             tasks_.pop_front();
 
-            int time_dur = clock() - task_enter_time_.front() / CLOCKS_PER_SEC * 1000;
+            int time_dur = (clock() - task_enter_time_.front()) / CLOCKS_PER_SEC * 1000;
             task_enter_time_.pop_front();
 
             if (time_dur >= Config::kLatencyThreshold)
