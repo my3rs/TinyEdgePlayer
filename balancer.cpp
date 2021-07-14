@@ -146,7 +146,7 @@ ServerPtr Balancer::SelectServerGame_()
 	else
 	{
 		// 到达服务队列末尾
-		if (offset = server_queue_.size())
+		if (offset == server_queue_.size())
 		{
 			offset = 0;
 			return server_queue_[offset];
