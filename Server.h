@@ -87,6 +87,10 @@ public:
 
     /* get RAM容量 */
     unsigned GetRamSize() { return storage_.GetSize(); }
+   
+    /* 调整限流器 */
+    void    ReduceQps();
+    void    RaiseQps();
 
 private:
     int         id_;        // 服务器序号
@@ -98,6 +102,12 @@ private:
     std::thread game_thread_;   // 博弈线程
     bool        shutdown_;      // 用来控制GC线程和博弈的停止。cpu_自己有结束标识，不用这个shutdown_
     RateLimiter rate_limiter_;  // 限流器
+
+    /* 存储总的任务耗时和任务数量，以便于计算任务的平均耗时 */
+    unsigned    sum_task_time_;     // 单位为 ms
+    unsigned    sum_task_count_;
+
+    uint64_t    qps_;
 
 private:
     /**

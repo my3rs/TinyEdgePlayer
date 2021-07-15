@@ -7,7 +7,8 @@ Server::Server(int cpu, int ram, int id)
         storage_(ram), id_(id),
         weight_(1),
         cpu_core_count_(cpu + 1),
-        rate_limiter_(Config::kDefaultRateLimit)
+        rate_limiter_(Config::kDefaultRateLimit),
+        qps_(Config::kDefaultRateLimit)
 {
     shutdown_ = false;
 
@@ -19,6 +20,11 @@ Server::Server(int cpu, int ram, int id)
 auto Server::Execute(Task t) -> std::future<bool>
 {
     rate_limiter_.pass();
+
+    /* 统计任务数量和耗时，并通知 CPU */
+    sum_task_count_++;
+    sum_task_time_ += t.time;
+    cpu_.SetAvgTaskTime(sum_task_time_ / sum_task_count_);
 
     return cpu_.template ExecuteTask([this, t]() -> bool {
         if (t.storage != 0)     // 对于纯计算型任务，跳过操作内存的操作
@@ -68,8 +74,8 @@ void Server::GcFunc()
         Execute(Task(Config::kGcTime, 0));
         storage_.Free(Config::kGcSize);
 
-        if (g_config.Verbose)
-            LOG(INFO) << "Freed " << Config::kGcSize << "MB RAM";
+        /*if (g_config.Verbose)
+            LOG(INFO) << "Freed " << Config::kGcSize << "MB RAM";*/
 
         if (shutdown_)
             return;
@@ -89,6 +95,21 @@ int Server::GetWeight()
 }
 
 
+void Server::ReduceQps()
+{
+    if (qps_ <= 50)
+        return;
+
+    qps_ -= 10;
+    rate_limiter_.SetQps(qps_);
+}
+
+void Server::RaiseQps()
+{
+    qps_ += 10;
+    rate_limiter_.SetQps(qps_);
+}
+
 std::shared_ptr<Server> CreateOneServer(int id)
 {
     static auto seed = std::chrono::steady_clock::now().time_since_epoch().count();
@@ -99,3 +120,4 @@ std::shared_ptr<Server> CreateOneServer(int id)
 
     return std::make_shared<Server>(u_cpu(engine), u_ram(engine), id);
 }
+
