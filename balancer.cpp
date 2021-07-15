@@ -31,6 +31,12 @@ void Balancer::Init(const std::vector<std::shared_ptr<Server>>& server_pool)
 void Balancer::SetLoadBlanceAlgorithm(LoadBalanceAlgorithm a)
 {
 	lb_algorithm_ = a;
+	
+	// 如果使用 game 算法，先生成一个 server queue
+	if (a == LoadBalanceAlgorithm::Game)
+	{
+		UpdateServerQueue_();
+	}
 }
 
 LoadBalanceAlgorithm Balancer::GetLoadBlanceAlgorithm()
@@ -42,6 +48,8 @@ LoadBalanceAlgorithm Balancer::GetLoadBlanceAlgorithm()
 void Balancer::UpdateServerQueue_()
 {
 	is_server_queue_ready_ = false;
+
+	server_queue_.clear();
 
 	std::vector<int>	initial_weight;		// 真实权重
 	std::vector<int>	current_weight;		// 临时权重
@@ -75,6 +83,11 @@ void Balancer::UpdateServerQueue_()
 	}
 
 	is_server_queue_ready_ = true;
+
+	/*if (g_config.Verbose)
+	{
+		LOG(INFO) << "Updated server queue. queue.size=" << server_queue_.size();
+	}*/
 }
 
 ServerPtr Balancer::SelectServerRoundRobin_()
@@ -108,7 +121,7 @@ ServerPtr Balancer::SelectServerPower_()
 
 	if (first == second)
 		return servers_[first];
-	else if (servers_[first]->GetCpuLoad() <= servers_[second]->GetCpuLoad())
+	else if (servers_[first]->GetBlockRate() <= servers_[second]->GetBlockRate())
 		return servers_[first];
 	else
 		return servers_[second];
@@ -118,45 +131,80 @@ ServerPtr Balancer::SelectServerGame_()
 {
 	static int offset;
 
-	// 如果`server_queue_`没有准备好，需要处理几下情况：
-	// 1. 首次运行，`server_queue_`为空 -> 借用轮询算法，同时更新`server_quque_`；
-	// 2. 非首次运行，`server_queue_`正在被更新 -> 使用旧的服务队列；
-	if (!is_server_queue_ready_)
+	// server queue 用完
+	if (offset == server_queue_.size() && offset != 0)
 	{
-		if (server_queue_.empty())	// 情况1：首次运行
+		offset = 0;
+		if (is_server_queue_ready_)
 		{
-			std::thread t([this]() {
+			std::thread t([this] {
 				UpdateServerQueue_();
 				});
 			t.detach();
-
 			return SelectServerRoundRobin_();
 		}
-		else						// 情况2：非首次运行
-		{
-			if (offset == server_queue_.size())
-			{
-				offset = 0;
-				return server_queue_[offset];
-			}
-			return server_queue_[offset++];
-		}
 	}
-	// `server_queue_`准备好的情况
+	else if (!is_server_queue_ready_)
+	{
+		return SelectServerRoundRobin_();
+	}
 	else
 	{
-		// 到达服务队列末尾
-		if (offset == server_queue_.size())
-		{
-			offset = 0;
-			return server_queue_[offset];
-		}
-		// 没到服务队列末尾，轮询`server_queue_`即可
-		else
-		{
-			return server_queue_[offset++];
-		}
+		return server_queue_[offset++];
 	}
+
+
+	// 如果`server_queue_`没有准备好，需要处理几下情况：
+	// 1. 首次运行，`server_queue_`为空 -> 借用轮询算法，同时更新`server_quque_`；
+	// 2. 非首次运行，`server_queue_`正在被更新 -> 使用旧的服务队列；
+	//if (!is_server_queue_ready_)
+	//{
+	//	if (g_config.Verbose)
+	//		LOG(INFO) << "Server queue is not ready";
+
+	//	if (server_queue_.empty())	// 情况1：首次运行
+	//	{
+	//		if (g_config.Verbose)
+	//			LOG(INFO) << "Updating server queue...";
+
+	//		std::thread t([this]() {
+	//			UpdateServerQueue_();
+	//			});
+	//		t.detach();
+
+	//		return SelectServerRoundRobin_();
+	//	}
+	//	else						// 情况2：非首次运行
+	//	{
+	//		if (offset == server_queue_.size())
+	//		{
+	//			if (g_config.Verbose)
+	//				LOG(INFO) << "server queue 用完，重头开始";
+
+	//			offset = 0;
+	//			return server_queue_[offset];
+	//		}
+	//		return server_queue_[offset++];
+	//	}
+	//}
+	//// `server_queue_`准备好的情况
+	//else
+	//{
+	//	if (g_config.Verbose)
+	//		LOG(INFO) << "Server queue is ready";
+
+	//	// 到达服务队列末尾
+	//	if (offset == server_queue_.size())
+	//	{
+	//		offset = 0;
+	//		return server_queue_[offset];
+	//	}
+	//	// 没到服务队列末尾，轮询`server_queue_`即可
+	//	else
+	//	{
+	//		return server_queue_[offset++];
+	//	}
+	//}
 }
 
 ServerPtr Balancer::SelectOneServer()
