@@ -18,6 +18,11 @@ RateLimiter::RateLimiter(int64_t qps) :
     lastAddTokenTime_ = now();
 }
 
+void RateLimiter::SetQps(int64_t qps)
+{
+	supplyUnitTime_ = NS_PER_SECOND / qps;
+}
+
 int64_t RateLimiter::now()
 {
 	struct timeval tv;

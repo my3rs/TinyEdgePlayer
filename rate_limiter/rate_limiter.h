@@ -32,6 +32,8 @@ public:
     //对外接口，能返回说明流量在限定值内
     void pass();
 
+    void SetQps(int64_t qps);
+
 private:
 
     //获得当前时间，单位ns
@@ -56,7 +58,8 @@ private:
     AtomicSequence tokenLeft_;
 
     //补充令牌的单位时间
-    const int64_t supplyUnitTime_;
+    //const int64_t supplyUnitTime_;
+    int64_t supplyUnitTime_;
 
     //上次补充令牌的时间，单位纳秒
     int64_t lastAddTokenTime_;
