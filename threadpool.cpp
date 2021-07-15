@@ -5,6 +5,7 @@
 
 ThreadPool::ThreadPool(unsigned int threads_cnt)
         :  cnt_threads_(threads_cnt),
+        avg_task_time_(50),
         shutdown_(false),
         power_(threads_cnt)
 {
@@ -84,11 +85,13 @@ void ThreadPool::_WorkerRoutine()
             task = std::move(tasks_.front());
             tasks_.pop_front();
 
-            int time_dur = (clock() - task_enter_time_.front()) / CLOCKS_PER_SEC * 1000;
+            auto start = task_enter_time_.front();
             task_enter_time_.pop_front();
 
-            if (time_dur >= Config::kLatencyThreshold)
-            {
+            auto time_dur = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start);
+
+            if (time_dur.count() >= avg_task_time_ * 0.8)
+            {   // 如果任务的等待时间超过任务平均耗时的80%，认为该任务阻塞时间过长，标记为 blocked_task
                 blocked_tasks_in_one_second_++;
             }
         }
@@ -111,7 +114,7 @@ void ThreadPool::_MonitorRoutine()
 
         std::this_thread::sleep_for(std::chrono::seconds(1));
 
-        /* 1. load */
+        /* 1. CPU 使用率 */
         loads_.push_back(GetLoad());
         while (loads_.size() > 3)
             loads_.pop_front();
@@ -122,31 +125,31 @@ void ThreadPool::_MonitorRoutine()
         while (blocked_tasks_.size() > 3)
             blocked_tasks_.pop_front();
 
-        /* 3. speed 和 task queue size */
-
-        // 后面这个if内的代码是为了保证
-        // “线程处理速度”和“任务队列长度”两个指标的值不为0
-        if (tasks_completed_in_one_second_ == 0 || tasks_.size() == 0)
+        /* 3. 任务处理速度 */
+        if (tasks_completed_in_one_second_ == 0)
         {
             speeds_.push_back(1);
-            task_queue_size_.push_back(1);
-
-            // 不用判断speeds_和task_queue_size_的长度是不是大于3
-            // 直接进入到下一轮多pop一次就好
-
-            continue;   // 一定要跳过本次循环
         }
-            
-
-        speeds_.push_back(tasks_completed_in_one_second_);
+        else
+        {
+            speeds_.push_back(tasks_completed_in_one_second_);
+            tasks_completed_in_one_second_ = 0;
+        }
         while (speeds_.size() > 3)  // 别用if
             speeds_.pop_front();
 
-        task_queue_size_.push_back(tasks_.size() + 2);
+        /* 4. 任务队列长度 */
+        if (tasks_.empty())
+        {
+            task_queue_size_.push_back(1);
+        }
+        else
+        {
+            task_queue_size_.push_back(tasks_.size() + 2);
+        }
+
         while (task_queue_size_.size() > 3) // 别用if
             task_queue_size_.pop_front();
-
-        tasks_completed_in_one_second_ = 0;
     }
 }
 
@@ -202,7 +205,6 @@ double ThreadPool::GetAverageLoad() const
 double ThreadPool::GetPower()
 {
     // 每次调用都会计算新值
-    // 所以该函数不应该频繁被调用？
     power_ = 0.37 * power_ + 0.63 * (GetCurrentSpeed() / GetTaskQueueSize());   // 指数移动平均
     return power_;
 }
@@ -212,13 +214,24 @@ double ThreadPool::GetBlockRate()
 {
     std::deque<unsigned> tmp(blocked_tasks_);
 
+    if (tmp.empty())
+        return 0.01;
+
     unsigned sum = std::accumulate(tmp.begin(), tmp.end(), 0.0);
     double mean = sum / tmp.size();
 
-    return mean / GetCurrentSpeed();
+    double rate = mean / GetCurrentSpeed();
+
+    return rate < 0.01 ? 0.01 : rate;
 }
 
 unsigned ThreadPool::GetThreadCount()
 {
     return worker_threads.size();
+}
+
+
+void ThreadPool::SetAvgTaskTime(double t)
+{
+    avg_task_time_ = t;
 }

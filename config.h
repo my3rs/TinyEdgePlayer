@@ -1,6 +1,8 @@
 #ifndef EDGEPLAYER_CONFIG_H
 #define EDGEPLAYER_CONFIG_H
 
+#include <string>
+
 struct GlobalConfig
 {
     GlobalConfig()
@@ -20,10 +22,10 @@ extern GlobalConfig g_config;
 namespace Config
 {
     const unsigned kGameTerm = 1;    // 单位 s
-    const unsigned kLatencyThreshold = 80; // 单位 ms
+    const unsigned kLatencyThreshold = 100; // 单位 ms
 
     // 任务的最短和最长耗时，单位 ms
-    const unsigned kMinRequestTime = 50;
+    const unsigned kMinRequestTime = 30;
     const unsigned kMaxRequestTime = 150;
 
     // 任务的最小和最大存储占用，单位 MB
@@ -41,10 +43,14 @@ namespace Config
     const unsigned kGcInterval = 1000;
 
     // 默认的限流参数，单位 QPS
-    const unsigned kDefaultRateLimit = 80;
+    // 限流针对的是每台服务器
+    const unsigned kDefaultRateLimit = 50;
 
     // 客户端发送请求的时间时隔，单位 ms
     const unsigned kRequestInterval = 20;
+
+    // 存放实验数据的目录
+    const std::string data_file_path = "/home/patric/data/";
 }
 
 #endif //EDGEPLAYER_CONFIG_H

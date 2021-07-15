@@ -11,7 +11,11 @@
 
 #include <glog/logging.h>
 
-
+/*
+* 线程池
+* 用来模拟CPU，线程数量固定不可扩展，因为每一个线程代表一个CPU核心
+* ExecuteTask() 函数用来接受一个任务，任务类型为一个可执行对象
+*/
 
 class ThreadPool
 {
@@ -39,7 +43,6 @@ public:
     double  GetPower();
 
 
-
     /* 等待所有线程结束，然后关闭线程池 */
     void JoinAll();
 
@@ -60,6 +63,9 @@ public:
     /* get 线程数量 */
     unsigned GetThreadCount();
 
+    /* set 平均任务耗时 */
+    void SetAvgTaskTime(double t);
+
 private:
     /* worker 线程函数 */
     void _WorkerRoutine();
@@ -79,7 +85,7 @@ private:
 
     /* 以下两个队列要同时操作进出 */
     std::deque<std::function<void ()>>  tasks_; // 任务队列
-    std::deque<clock_t>     task_enter_time_;   // 每一个任务的入队时间
+    std::deque<std::chrono::system_clock::time_point>     task_enter_time_;   // 每一个任务的入队时间
 
     std::atomic<unsigned>   tasks_completed_in_one_second_;     // 1秒内完成的任务数量，每秒清除一次
     std::atomic<unsigned>   blocked_tasks_in_one_second_;       // 没有在规定时间内完成的任务数量，每秒清除一次
@@ -89,6 +95,9 @@ private:
     std::deque<double>      loads_;             // 最近3次的线程池使用率
 
     double                  power_;             // 算力，初始值为线程池中的线程数量
+
+    double                  avg_task_time_;     // 平均任务耗时，由 Server 调用 SetAvgTaskTime(double) 接口进行设置，初始为50
+    
 };
 
 template<typename F, typename... Args>
@@ -121,7 +130,7 @@ auto ThreadPool::ExecuteTask(F &&f, Args&&... args)
     };
 
     // 任务入队的同时进行计时
-    task_enter_time_.emplace_back(clock());
+    task_enter_time_.emplace_back(std::chrono::system_clock::now());
     tasks_.emplace_back(std::move(task));
 //    LOG(INFO) << "ThreadPool task size: " << tasks_.size();
 
