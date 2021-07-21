@@ -71,6 +71,7 @@ void Server::GcFunc()
 {
     while (!shutdown_)
     {
+        // 做GC会向CPU中添加一个任务，模拟GC的时间耗时
         Execute(Task(Config::kGcTime, 0));
         storage_.Free(Config::kGcSize);
 
