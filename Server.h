@@ -87,6 +87,9 @@ public:
 
     /* get RAM容量 */
     unsigned GetRamSize() { return storage_.GetSize(); }
+
+    /* set 内存管理的时间间隔 */
+    void    SetGcInterval(int interval) { g_config.GcInterval = interval; }
    
     /* 调整限流器 */
     void    ReduceQps();
