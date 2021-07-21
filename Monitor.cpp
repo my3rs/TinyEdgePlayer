@@ -169,7 +169,7 @@ void Monitor::SaveExperimentDataToFile()
     }
     var_file.close();
 
-    /* 2. max data */
+    /* 3. max data */
     max_file.open(Config::data_file_path + balancer_ + ".max.txt", std::ios::out | std::ios::trunc);
     max_file << "最大CPU" << "\t" << "最大RAM" << "\t" << "最大等待时间" << "\t" << "最大other" << std::endl;
 
